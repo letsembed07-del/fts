@@ -58,108 +58,141 @@
     
   </head>
   <!-- Telegram Join Message -->
+<!-- Telegram Mesage ENd Here -->
+
 <script>
   document.addEventListener("DOMContentLoaded", () => {
-    const lastShown = localStorage.getItem("telegramMessageLastShown");
+    // --- Configuration ---
+    const DISCORD_INVITE_LINK = "https://discord.gg/htmB2TbK";
+    const POPUP_COOLDOWN_HOURS = 24; // How many hours until the popup shows again
+    const SECONDS_UNTIL_CLOSE = 5;   // How long the popup stays visible
+
+    // Check if the popup should be shown based on the last time it was seen
+    const lastShown = localStorage.getItem("discordPopupLastShown");
     const now = Date.now();
-    const oneDay = 24 * 60 * 60 * 1000;
+    const cooldown = POPUP_COOLDOWN_HOURS * 60 * 60 * 1000;
 
-    if (!lastShown || now - lastShown > oneDay) {
-      localStorage.setItem("telegramMessageLastShown", now.toString());
+    if (!lastShown || now - lastShown > cooldown) {
+      // --- 1. Create and Inject CSS Styles for the Popup ---
+      // This approach is cleaner than setting each style property in JavaScript.
+      const styles = `
+        #discord-popup {
+          position: fixed;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%) scale(0.9); /* Start smaller for animation */
+          background: rgba(20, 20, 25, 0.7);
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          color: white;
+          padding: 25px;
+          border-radius: 20px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+          opacity: 0;
+          /* Smooth transition for opacity and transform */
+          transition: opacity 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+          z-index: 10000;
+          text-align: center;
+          width: 90%;
+          max-width: 400px;
+          font-family: 'Poppins', 'Quicksand', sans-serif;
+        }
 
-      const telegramMessage = document.createElement("div");
-      telegramMessage.id = "telegramMessage";
-      telegramMessage.style.position = "fixed";
-      telegramMessage.style.top = "50%";
-      telegramMessage.style.left = "50%";
-      telegramMessage.style.transform = "translate(-50%, -50%)";
-      telegramMessage.style.background = "rgba(0, 0, 0, 0.6)";
-      telegramMessage.style.backdropFilter = "blur(12px)";
-      telegramMessage.style.webkitBackdropFilter = "blur(12px)";
-      telegramMessage.style.border = "1px solid rgba(255, 255, 255, 0.1)";
-      telegramMessage.style.color = "white";
-      telegramMessage.style.padding = "20px";
-      telegramMessage.style.borderRadius = "20px";
-      telegramMessage.style.display = "flex";
-      telegramMessage.style.flexDirection = "column";
-      telegramMessage.style.alignItems = "center";
-      telegramMessage.style.justifyContent = "center";
-      telegramMessage.style.boxShadow = "0 4px 15px rgba(0, 0, 0, 0.3)";
-      telegramMessage.style.opacity = "0";
-      telegramMessage.style.transition = "opacity 0.5s ease";
-      telegramMessage.style.zIndex = "99999";
-      telegramMessage.style.textAlign = "center";
-      telegramMessage.style.width = "90%";
-      telegramMessage.style.maxWidth = "400px";
-      telegramMessage.style.fontFamily = "'Quicksand', cursive";
+        /* This class triggers the "show" animation */
+        #discord-popup.visible {
+          opacity: 1;
+          transform: translate(-50%, -50%) scale(1);
+        }
 
-      // Telegram icon
-      const telegramIcon = document.createElement("img");
-      telegramIcon.src = "https://upload.wikimedia.org/wikipedia/commons/8/82/Telegram_logo.svg";
-      telegramIcon.alt = "Telegram Icon";
-      telegramIcon.style.width = "60px";
-      telegramIcon.style.height = "60px";
-      telegramIcon.style.borderRadius = "50%";
-      telegramIcon.style.marginBottom = "10px";
-      telegramIcon.style.boxShadow = "0 2px 5px rgba(0, 0, 0, 0.2)";
+        #discord-popup img {
+          width: 60px;
+          height: 60px;
+          margin-bottom: 15px;
+        }
 
-      // Telegram link
-      const telegramLink = document.createElement("a");
-      telegramLink.href = "https://telegram.me/Cinepeace_og";
-      telegramLink.target = "_blank";
-      telegramLink.style.color = "white";
-      telegramLink.style.textDecoration = "none";
-      telegramLink.style.fontSize = "18px";
-      telegramLink.style.fontWeight = "bold";
-      telegramLink.style.marginBottom = "10px";
-      telegramLink.textContent = "Join us on Telegram";
+        #discord-popup a {
+          color: #fff;
+          text-decoration: none;
+          font-size: 20px;
+          font-weight: 600;
+          margin-bottom: 15px;
+          transition: color 0.3s ease;
+        }
 
-      // VPN warning
-      const vpnMessage = document.createElement("div");
-      vpnMessage.textContent = "🔒 Turn on VPN if content is not showing or a blank screen & If in India If You Are Using Jio Network. Recommended: 1.1.1.1";
-      vpnMessage.style.fontSize = "13px";
-      vpnMessage.style.color = "rgba(255, 255, 255, 0.8)";
-      vpnMessage.style.marginTop = "5px";
-      vpnMessage.style.marginBottom = "10px";
-      vpnMessage.style.lineHeight = "1.4";
+        /* Discord brand color on hover */
+        #discord-popup a:hover {
+          color: #5865F2; 
+        }
+        
+        #discord-popup .vpn-message {
+          font-size: 13px;
+          color: rgba(255, 255, 255, 0.7);
+          line-height: 1.5;
+          margin-bottom: 15px;
+        }
+        
+        #discord-popup .countdown-timer {
+          font-size: 14px;
+          color: rgba(255, 255, 255, 0.9);
+        }
+      `;
 
-      // Countdown timer
-      const timer = document.createElement("div");
-      timer.id = "countdownTimer";
-      timer.style.color = "white";
-      timer.style.fontSize = "14px";
-      timer.style.marginTop = "10px";
+      const styleSheet = document.createElement("style");
+      styleSheet.innerText = styles;
+      document.head.appendChild(styleSheet);
 
-      // Assemble popup
-      telegramMessage.appendChild(telegramIcon);
-      telegramMessage.appendChild(telegramLink);
-      telegramMessage.appendChild(vpnMessage);
-      telegramMessage.appendChild(timer);
-      document.body.appendChild(telegramMessage);
+      // --- 2. Create the Popup HTML Elements ---
+      const discordPopup = document.createElement("div");
+      discordPopup.id = "discord-popup";
 
-      // Fade in
+      discordPopup.innerHTML = `
+        <img src="https://assets-global.website-files.com/6257adef93867e50d84d30e2/636e0a6cc3c481a15a141738_icon_clyde_white_RGB.svg" alt="Discord Logo">
+        <a href="${DISCORD_INVITE_LINK}" target="_blank">Join our Discord Community</a>
+        <div class="vpn-message">
+          🔒 Use a VPN (like 1.1.1.1) if you face issues, especially with Jio in India.
+        </div>
+        <div class="countdown-timer"></div>
+      `;
+      
+      document.body.appendChild(discordPopup);
+
+      // --- 3. Animate the Popup In ---
+      // We use a small timeout to ensure the browser applies the initial styles before animating.
       setTimeout(() => {
-        telegramMessage.style.opacity = "1";
-      }, 300);
+        discordPopup.classList.add("visible");
+        localStorage.setItem("discordPopupLastShown", now.toString());
+      }, 50);
 
-      // Countdown
-      let timeLeft = 5;
+      // --- 4. Start Countdown to Animate Out and Remove ---
+      let timeLeft = SECONDS_UNTIL_CLOSE;
+      const timerElement = discordPopup.querySelector(".countdown-timer");
+      
       const countdown = setInterval(() => {
-        timer.textContent = `Closing in ${timeLeft} second${timeLeft === 1 ? "" : "s"}...`;
+        timerElement.textContent = `This will close in ${timeLeft} second${timeLeft === 1 ? "" : "s"}...`;
         timeLeft -= 1;
+
         if (timeLeft < 0) {
           clearInterval(countdown);
-          telegramMessage.style.opacity = "0";
+          
+          // Trigger the "hide" animation
+          discordPopup.classList.remove("visible");
+
+          // Remove the element from the DOM after the animation completes
           setTimeout(() => {
-            telegramMessage.remove();
-          }, 500);
+            discordPopup.remove();
+          }, 400); // This delay should match the CSS transition duration
         }
       }, 1000);
     }
   });
 </script>
 
-<!-- Telegram Mesage ENd Here -->
+
+
   
   <!-- Bottom Menu Start -->
   <!-- Font Awesome & Google Fonts -->
